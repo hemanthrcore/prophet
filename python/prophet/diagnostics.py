@@ -758,3 +758,76 @@ def coverage(df: pd.DataFrame, w: int) -> pd.DataFrame:
         w=w,
         name='coverage',
     )
+
+
+def list_performance_metrics() -> list[str]:
+        """Return a list of all registered performance metric names.
+
+            Includes both the built-in metrics and any custom metrics registered
+                via :func:`register_performance_metric`.
+
+                    Returns
+                        -------
+                            list of str
+                                    Names of all currently registered performance metrics.
+
+                                        Examples
+                                            --------
+                                                >>> list_performance_metrics()
+                                                    ['mse', 'rmse', 'mae', 'mape', 'mdape', 'smape', 'coverage']
+                                                        """
+        return list(PERFORMANCE_METRICS.keys())
+
+
+def cross_validate_and_summarize(
+        model: 'Prophet',
+        horizon: str,
+        period: str | None = None,
+        initial: str | None = None,
+        metrics: list[str] | None = None,
+        rolling_window: float = 0.1,
+        parallel: 'Literal["processes", "threads", "dask"] | None' = None,
+        disable_tqdm: bool = False,
+) -> pd.DataFrame | None:
+        """Run cross-validation and compute performance metrics in one step.
+
+            This is a convenience wrapper that combines :func:`cross_validation` and
+                :func:`performance_metrics` into a single call.
+
+                    Parameters
+                        ----------
+                            model: Prophet class object. Fitted Prophet model.
+                                horizon: string with pd.Timedelta compatible style, e.g., '5 days',
+                                        '3 hours', '10 seconds'.
+                                            period: string with pd.Timedelta compatible style. Simulated forecast will
+                                                    be done at every this period. If not provided, 0.5 * horizon is used.
+                                                        initial: string with pd.Timedelta compatible style. The first training
+                                                                period will include at least this much data. If not provided,
+                                                                        3 * horizon is used.
+                                                                            metrics: A list of performance metrics to compute. If not provided, will
+                                                                                    use all registered metrics.
+                                                                                        rolling_window: Proportion of data to use in each rolling window for
+                                                                                                computing the metrics. Should be in [0, 1] to average.
+                                                                                                    parallel: {None, 'processes', 'threads', 'dask'}
+                                                                                                            How to parallelize the forecast computation. By default no
+                                                                                                                    parallelism is used.
+                                                                                                                        disable_tqdm: if True it disables the progress bar during cross-validation.
+                                                                                                                        
+                                                                                                                            Returns
+                                                                                                                                -------
+                                                                                                                                    pd.DataFrame with columns for each metric and 'horizon', or None if
+                                                                                                                                        no metrics could be computed.
+                                                                                                                                            """
+        df_cv = cross_validation(
+            model=model,
+            horizon=horizon,
+            period=period,
+            initial=initial,
+            parallel=parallel,
+            disable_tqdm=disable_tqdm,
+        )
+        return performance_metrics(
+            df=df_cv,
+            metrics=metrics,
+            rolling_window=rolling_window,
+        )
